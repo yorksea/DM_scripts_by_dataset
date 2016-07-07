@@ -1,20 +1,25 @@
 Amber York 9 Jun 2016 scripts version 2 (in /scripts dir)
-* for Essington's PelagicHypoxia, "bcodmo link":http://www.bco-dmo.org/dataset/648914
+
+## For dataset Essington's PelagicHypoxia
+
+[bco-dmo dataset http://www.bco-dmo.org/dataset/648914](http://www.bco-dmo.org/dataset/648914)
 ----------------------------------------------------
-"parse_ctd_makeCMDlist.pl":parse_ctd_makeCMDlist.pl
+[parse_ctd_makeCMDlist.pl](parse_ctd_makeCMDlist.pl)
 * IN: directory of xls files
 * OUT: cmd.txt , cmds_tab2.txt, cmds_tab3.txt
 * I executed in cygwin on windows
 
 Takes a folder full of xlsx files and produces a text file full of commands to convert them to csv.
 * xlsx files used are under intermediate_data/orig
+
 ----------------------------------------------------
 then in windows terminal I did @ cmd < cmd.txt @
 
 to execute the commands in the file
 
-* this called "XlsToCsv.vbs":XlsToCsv.vbs sourcefilepath sourcefilename for each of the xlsx files
-** created csvs of each tab are in:
+* this called [XlsToCsv.vbs](XlsToCsv.vbs) sourcefilepath sourcefilename for each of the xlsx files
+.* created csvs of each tab are in:
+
 intermediate_data/tab1
 intermediate_data/tab2
 intermediate_data/tab3
@@ -22,19 +27,20 @@ intermediate_data/tab3
 Only two files had a third tab (DO corrections for one, not sure what the values are in the other).
 
 ----------------------------------------------------
-"parse_ctd_toplevel.pl":parse_ctd_toplevel.pl
+[parse_ctd_toplevel.pl](parse_ctd_toplevel.pl)
 
-Usage: @perl parse_ctd_toplevel.pl 0@
+Usage: `perl parse_ctd_toplevel.pl`
 
 * IN: directory of csv files (intermediate_data/tab2)
 * OUT: hypoxia_toplevel.dat which grabs values from tab2 data
-** also outputs comments and header to toplevel
+.* also outputs comments and header to toplevel
 * the 0 during execution just means don't display stuff(I used 1 during development)
 * I executed in cygwin on windows
 
 ----------------------------------------------------
------XlsToCsv----
-Got the base of the XlsToCsv vbs scripts from "stackoverflow here":http://stackoverflow.com/questions/1858195/convert-xls-to-csv-on-command-line and modified as necessary for tab2/3:
+XlsToCsv
+
+Got the base of the XlsToCsv vbs scripts from "stackoverflow [here](http://stackoverflow.com/questions/1858195/convert-xls-to-csv-on-command-line and modified as necessary for tab2/3:)
 
 
 Modificaitons:
