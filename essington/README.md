@@ -2,7 +2,7 @@ Amber York 9 Jun 2016 scripts version 2 (in /scripts dir)
 
 ## For dataset Essington's PelagicHypoxia
 
-[bco-dmo dataset http://www.bco-dmo.org/dataset/648914](http://www.bco-dmo.org/dataset/648914)
+### bco-dmo dataset [ http://www.bco-dmo.org/dataset/648914](http://www.bco-dmo.org/dataset/648914)
 ----------------------------------------------------
 [parse_ctd_makeCMDlist.pl](parse_ctd_makeCMDlist.pl)
 * IN: directory of xls files
