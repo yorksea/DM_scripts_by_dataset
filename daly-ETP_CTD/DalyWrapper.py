@@ -3,6 +3,8 @@ from sys import platform as _platform
 from  DMTools import Line,xlsx2csv
 from wsgiref import headers
 
+#this wrapper used for dataset Daly CTD data
+# http://www.bco-dmo.org/node/651131
 
 origDir = '../intermediate_files/orig/ctd_all'
 outDir = '../intermediate_files/csv'
