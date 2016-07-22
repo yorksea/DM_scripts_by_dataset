@@ -1,15 +1,27 @@
-import os,re
+import os,re,time,datetime
 from sys import platform as _platform
 from  DMTools import Line,xlsx2csv
 from wsgiref import headers
 from operator import itemgetter #to sort list of dictionaries
 
 
-origDir = '../intermediate_files/orig/ctd_all'
-outDir = '../intermediate_files/csv'
-finalDataDir = '../cruise_data'
-
 PIname = 'daly'
+
+#data directories (for different stages or processing)
+intermediateDir = '../intermediate_files' #working files, all but final go here
+origDir = intermediateDir+'/orig/all' #data as submitted by PI
+rawAsciiDir = intermediateDir+'/raw' #csv version of submitted data, no changes
+uncleanDir = intermediateDir+'/uncleaned' #data formatted for BCO-DMO, may contain errors to be fixed in final
+finalDataDir = '../cruise_data' #final data to be served with changes between that and "unclean" in the provinance log
+provenanceDir= intermediateDir+'/provenance/'+str(time.mktime(datetime.datetime.utcnow().timetuple())) #new for every run
+
+#make dir if not exists
+for d in [intermediateDir,origDir,rawAsciiDir,uncleanDir,finalDataDir,provenanceDir]:
+    if not os.path.exists(d):
+        os.makedirs(d)
+     
+
+#TODO this system should be changed to a log per file changed in a provenance folder
 
 verbose = False
 #original data is one worksheet xlsx data
@@ -38,7 +50,8 @@ origHeader = 'Scan,Date,Time,Longitude,Latitude'
 fileComment = \
 '''# Eastern Tropical Pacific CTD DATA
 #    Kendra Daly, P.I.
-#    Version 25 Jun 2016
+#    Version 12 Jul 2016
+#     N.B. station 2 appears twice in the list at level 0 because it was revisited during the cruise
 '''
 
 cFile = open('../'+PIname+'.comment','w')
@@ -56,9 +69,23 @@ print(fileComment)
 datData =[]#list of dat dictionaries (one per file)
 
 
+def writeToProvenanceLog(logList,filename):
+    #write to log what was changed (
+    if logList is not None:        
+        logF = open(provenanceDir+'/'+re.sub('xls.*','txt',filename),'a');
+        for l in logList:                
+            logF.write(datetime.datetime.now().isoformat()+'\tFile:'+filename+'\tLINE:'+str(lineCount)+'\t'+l+'\n')
+        logF.close()
+###------------now for file looping-------------
+
 for filename in origFiles:
+    logList = []
+    
+    #skip upcasts
     if re.search('(^~|up)',filename,re.IGNORECASE):
+        writeToProvenanceLog(['Skipping file because it is an upcast'], filename)
         continue
+      
 
     dat = {}#dictionary for this file
     dat["outfile"] =re.sub('xlsx','dat',filename)
@@ -72,7 +99,7 @@ for filename in origFiles:
     print(filename)
     #print "Orig: "+filename
     infile = origDir+'/'+filename
-    outfile = outDir+'/'+re.sub('xlsx','csv',filename)
+    outfile = rawAsciiDir+'/'+re.sub('xlsx','csv',filename)
     if re.match("^S",filename):
         dat["year"] = '2007'
         dat["castno"] = re.sub('.*\.','',re.sub('_.*','',filename)) #SJ07.072.16_KD_BIN.dat
@@ -87,9 +114,12 @@ for filename in origFiles:
             xlsx2csv(infile, outfile)
             print("xlsx2csv("+infile+","+ outfile+')')      
         
-    csvFile = open( outDir+'/'+re.sub('xlsx','csv',filename),'r') #the file directly after xls2csv conversion, no manipulation yet
-    finalFile = open(finalDataDir+'/'+re.sub('xlsx','dat',filename),'w') #file to write to for serving
+    rawFile = open( rawAsciiDir+'/'+re.sub('xlsx','csv',filename),'r') #the file directly after xls2csv conversion, no manipulation yet    
+    uncleanFile = open(uncleanDir+'/'+re.sub('xlsx','dat',filename),'w') #files to write to for serving (no threholded nds)
+    finalFile = open( finalDataDir+'/'+re.sub('xlsx','dat',filename),'w') #files to write to for final serving
     
+    uncleanFile.write(fileComment) #don't need if have vars file
+    uncleanFile.write(header+'\n')
     finalFile.write(fileComment) #don't need if have vars file
     finalFile.write(header+'\n')
     
@@ -97,21 +127,15 @@ for filename in origFiles:
 
     dataStartAt = '' #will be changed once orig header lineText read
      
-    for origline in csvFile:
+    for origline in rawFile:
         origline = origline.rstrip('\r\n')
-         
+        
         if bool(re.search(origHeader,origline)): 
             dataStartAt = lineCount+2
        
-        line = Line(origline) #this makes the lineText a Line class so can access methods for QA
+        line = Line(origline,header) #this makes the lineText a Line class so can access methods for QA
                
-        #if lineText.isDataLine(): #this works or do by dataStartAt detection
-        if lineCount >= dataStartAt:
-            line.stripQuotePairs()
-            finalFile.write(line.getText()+'\n')
-        
-        if verbose == True:
-            print(str(lineCount)+' '+str(line.isDataLine())+' '+line.getText())
+       
             
         #fill in toplevel data if on this lineText
         
@@ -145,16 +169,16 @@ for filename in origFiles:
         
         #if re.match('Knorr',lineText):
         if bool(re.search('Knorr',lineText)):
-            print("Line "+lineText)
+            #print("Line "+lineText)
             dat['cruise_id'] = 'KN195-02'
             
         if bool(re.search('RVSJ',lineText)):
-            print("Line "+lineText)
+            #print("Line "+lineText)
             dat['cruise_id'] = 'SJ07' #TODO need to find num
                 
 
         if bool(re.search('NMEA Latitude',lineText)):
-            print("Line "+lineText)
+            #print("Line "+lineText)
             lat_start = re.sub('.*= ','',lineText, re.IGNORECASE)    
             if re.match('S',lat_start):
                 lat_start = '-'+lat_start
@@ -163,15 +187,22 @@ for filename in origFiles:
              
 
         if bool(re.search('NMEA Longitude',lineText)):
-            print("Line "+lineText)
-            lon_start = re.sub('.*= ','',lineText, re.IGNORECASE) 
+            #print("Line "+lineText)
+            
+            lon_start = re.sub('.*= ','',lineText, re.IGNORECASE)
+            station_lon_deg =  re.sub(' .*','',lon_start, re.IGNORECASE)
+            
+            #jus for this datset it should be neg
+            station_lon_deg = "-"+station_lon_deg
+            
             if re.match('W',lat_start):
                 lon_start = '-'+lon_start
+            
             lon_start = re.sub('(N|S|E|W|\s*)','',lon_start) 
             dat['lon_start'] =  re.sub('\D*$','',lon_start) 
                 
         if bool(re.search('NMEA UTC',lineText)):
-            print("Line "+lineText)
+            #print("Line "+lineText)
             date_string =  re.sub('.*= ','',lineText, re.IGNORECASE) 
             dateparts = date_string.split(' ')
             time = dateparts[len(dateparts)-1] #time is the last one
@@ -181,7 +212,7 @@ for filename in origFiles:
             dat['date_string'] = date_string 
 
         if bool(re.search('Station',lineText,re.IGNORECASE)) and dat['station'] == 'nd':  #second logic to catch first description of station
-            print("Line "+lineText)
+            #print("Line "+lineText)
             #this didn't work becaues matches stuff like "** 195-02-032 Station 8 deep cast (2500 m)"
             #need to have different lineText numbers for     
             station = re.sub('.*Station: ','',lineText,re.IGNORECASE)
@@ -203,13 +234,55 @@ for filename in origFiles:
             
             station = station.lower()
             dat['station'] = station
-                           
+
+        #----------------start main data section------------------
+        #if lineText.isDataLine(): #this works or do by dataStartAt detection
+        if lineCount >= dataStartAt:
+            
+            uncleanFile.write(line.getText()+'\n') #write to .dat 
+            
+            l = line.stripQuotePairs()
+            logList.extend(l)
+            
+            #deal with errors in data
+            
+            if bool(re.search(dat["station"],"^2&")) & (re.search(dat["castno"],"^12&" ) is False):#replace lon in all station 2 but castno 12
+                #this triggers all lons to nd
+                line.changeByThresh(['True is True'],['lon'],'nd',False) 
+                #this is logged at end of line loop               
+            else:
+                #logic = ['lon > - 50','lon < -150'] #if True then bad data
+                #changing logic to a by diff of station lon deg and data lon deg
+                logic = ['abs( round(self.getParam("lon")) - '+str(float(station_lon_deg))+') > 2'] #bad if more than three degrees off station start lon
+                #print(logic)
+                b = eval(str(logic))
+                l= line.changeByThresh(logic,['lon'],'nd',False)
+                logList.extend(l)
+            finalFile.write(line.getText()+'\n')
+        
+            #test to stop where first replacement
+           # if re.search('nd',newline):
+           #     raw_input("Press Enter to continue...")
+        
+        if verbose is True:
+            print(str(lineCount)+' '+str(line.isDataLine())+' '+line.getText())
+            
+        #----------------end main data section------------------                               
         lineCount += 1
-    
-    csvFile.close()
+        #end line loop
+    rawFile.close()
+    uncleanFile.close()
     finalFile.close()
     
-
+    if bool(re.search(dat["station"],"^2&")) & (re.search(dat["castno"],"^12&") is False):
+        #this triggers all lons to nd
+        logList.extend(['Changed all lon to nd in file: '+filename+' beacause all station 2 but castno 12 is unreliable longitude'])
+        
+    #write logs
+    if logList is not None:        
+        writeToProvenanceLog(logList, filename)
+    
+    
     #add to dat dictionary list
     datData.append(dat)
 #end filename loop   
@@ -235,8 +308,11 @@ for dat in datData:
         >>> d.as_tuple().exponent
         -4
           '''  
+    #construct newline
+ 
+    
     for param in toplevel_header_list:
-        print(param+" "+dat[param]+toplevel_data_delimiter)
+       # print(param+" "+dat[param]+toplevel_data_delimiter)
 
         topf.write(dat[param]+toplevel_data_delimiter)
         if param == toplevel_header_list[-1]: #add filename and line return  if last
