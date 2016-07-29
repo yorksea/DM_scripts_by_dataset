@@ -8,7 +8,8 @@ header = 'event,instrument,castno,station,action,month_local,day_local,time_loca
 headerList = header.split(',')
 
 filepath = '../event_logs/'
-files = ['SJ07.csv','KN195-02.csv']
+#files = ['SJ07.csv','KN195-02.csv']
+files =  ['SJ07.csv','KN195-02v2.csv']
 
 #fout = open(filepath+'event_logs.dat','w')
 
@@ -69,12 +70,12 @@ for file in files:
         lat  = re.sub('\'','',lat)#remove tick marks
         lon  = re.sub('\'','',lon)#remove tick marks
         #print "["+lon+"]"
-        lat  = re.sub(':',' ',lat)
+        lat  = re.sub(':',' ',lat)#remove time format from lat lon
         lon  = re.sub(':',' ',lon)
         
         #remove .\s
-        lat  = re.sub('\.\s',' ',lat)#remove tick marks
-        lon  = re.sub('\.\s',' ',lon)#remove tick marks
+        lat  = re.sub('\.\s',' ',lat)#remove space
+        lon  = re.sub('\.\s',' ',lon)
         
         #correct a known mistakes in original submission
         lon = re.sub('^150','105',lon) #finger entry error
@@ -137,6 +138,7 @@ for file in files:
            year = '2007'
         newline = year+","+cruise_id+","+",".join(parts)
         fout.write(newline+'\n')
-        #print newline+"\n"
+        print newline
     f.close()
 fout.close()
+print "Done!"
