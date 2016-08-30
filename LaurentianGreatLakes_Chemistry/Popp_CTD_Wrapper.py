@@ -50,7 +50,7 @@ LogDict['fileList'] = []
 LogDict['fileMessages'] = [] #append to list every loop of files
 gitInfo = {}
 gitInfo['dmotools']= {'SHA-1': '22d89230708b66f60af189a15d8ba454285e69ff','repo':'https://github.com/BCODMO/dmtools'}
-gitInfo['wrapper'] =   {'wrapper':{'SHA-1': '22d89230708b66f60af189a15d8ba454285e69ff'} }  }
+gitInfo['wrapper'] =   {'repo':'https://github.com/BCODMO/DM-scripts-by-dataset/tree/master/LaurentianGreatLakes_Chemistry','file':'Popp_CTD_Wrapper.py'} 
 logDict['gitInfo'] = gitInfo
 print(dataDirs['raw'])
 for rawfile in rawfiles: 
