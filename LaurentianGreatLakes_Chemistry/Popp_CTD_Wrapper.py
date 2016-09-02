@@ -26,7 +26,7 @@ topf = open('../'+dataset_identifier+'_toplevel.dat','w')
 topf.write(fileComment)
 topf.write('cruise_id,station,cast,lat,lon,ISO_DateTime_UTC,>\n') #lineText must end ,>
 toplevel_datalines = []
-toplevel_second_header = [] #will be filled in dynamically from each file
+all_params_in_orig_files = [] #will be filled in dynamically from each file
 
 logList = []#will be filled with dictionraries of log messages
 #------------extract sheets-------------
@@ -49,11 +49,12 @@ LogDict['dataStorageLocation'] = 'dmoserv3:/data302/'+datasetFolder
 LogDict['fileList'] = []
 LogDict['fileMessages'] = [] #append to list every loop of files
 gitInfo = {}
-gitInfo['dmotools']= {'SHA-1': '22d89230708b66f60af189a15d8ba454285e69ff','repo':'https://github.com/BCODMO/dmtools'}
+gitInfo['dmotools']= {'repo':'https://github.com/BCODMO/dmtools'}
 gitInfo['wrapper'] =   {'repo':'https://github.com/BCODMO/DM-scripts-by-dataset/tree/master/LaurentianGreatLakes_Chemistry','file':'Popp_CTD_Wrapper.py'} 
-logDict['gitInfo'] = gitInfo
+LogDict['gitInfo'] = gitInfo
+
 print(dataDirs['raw'])
-for rawfile in rawfiles: 
+for rawfile in rawfiles:
     lineMessages  = []
     
     if not re.search('Sheet1',rawfile):
@@ -110,8 +111,7 @@ for rawfile in rawfiles:
         origline = re.sub('^,','',origline) #all files in this dataset have this problem of an empty column which results in a leading comma        
         origline = origline.rstrip('\r\n')
         #finalLine = Line(origline) #will fill in header after it is built with setHeader
-        finalLine = Line(**{'text':origline,'lineNum':linecount}) #works but not needed
-        #finalLine = Line(**{'text':origline,'lineNum':linecount,'sourceFile':rawfile}) #works but not needed
+        finalLine = Line(**{'dataline':origline,'lineNum':linecount}) #works but not needed
         #print(str(linecount)+'\t'+origline)    
         if re.search('^======',origline):
             #don't print
@@ -125,7 +125,7 @@ for rawfile in rawfiles:
             #check for trailing commas (for comment lines only)
             finalLine.stripCommas()
             
-            if re.search('#,name',finalLine.getText()):
+            if re.search('#,name',finalLine.getData()):
                 #make header from these lines
                 finalLine.replaceUnicode() #some params have this
 
@@ -135,8 +135,8 @@ for rawfile in rawfiles:
                 newIndex = parts[2]#which column of data this is (starting at 0) #not used right now
                 header.append(newHeaderItem)
                 #add to toplevel second header if doesn't exist
-                if not newHeaderItem in toplevel_second_header:
-                    toplevel_second_header.append(newHeaderItem)
+                if not newHeaderItem in all_params_in_orig_files:
+                    all_params_in_orig_files.append(newHeaderItem)
                     #print("new param:"+newHeaderItem+" from line: "+str(linecount))
                     #print rawfile+' '+origline+'\n'
                         
@@ -144,10 +144,6 @@ for rawfile in rawfiles:
             #print("Comment: "+origline)
             continue
         
-    
-        #done building header so add to Line
-        finalLine.setHeader(header)
-        #print('Headerline: '+finalLine.getHeader())
         
         #if it got to here then it's data
         datalinecount = datalinecount+1
@@ -161,14 +157,19 @@ for rawfile in rawfiles:
             #print(specificLine)
             #write header
 
+            orig_header = header
+            header = paramLookup(**{'lookupfile':'param_lookup_table.xlsx','origHeader':orig_header})
+            #done building header so add to Line
             ffinal.write(fileComment)
             ffinal.write('#      cruise: '+cruise_id+'\n')
-            ffinal.write(finalLine.getHeader()+'\n')
+            ffinal.write(','.join(header)+'\n')
             #done building header
             
            
             continue   
         
+        finalLine.setHeader(header)
+        #print('Headerline: '+finalLine.getHeader())
 
         finalLine.roundVal('lat,lon',4)
         
@@ -176,10 +177,13 @@ for rawfile in rawfiles:
         
         
         firstParam =finalLine.getHeaderList()[0]
-        if re.search('-9.99e-29',finalLine.getText()): #Houston we have a problem
+        if re.search('-9.99e-29',finalLine.getData()): #Houston we have a problem
             finalLine.replaceAllBadValues()#that bad value is already known so don't have to specify it
-            
-        ffinal.write(finalLine.getText()+'\n')#prints as comma delimited text
+        
+        
+        finalLine.matchHeaderLengthIfEmpty() #if length of data and header different, removes last values only if they are empty
+
+        ffinal.write(finalLine.getData()+'\n')#prints as comma delimited text
         m = finalLine.getLog(**{'format':'dict'})
         if len(m['messages']) > 0: #append if anything to say
             lineMessages.append(m)
@@ -201,9 +205,9 @@ for rawfile in rawfiles:
 
 utils.writeToLog({'errorLog':LogDict},flog)
 
-print("all data header:\n     "+ ','.join(toplevel_second_header))
-print("Matched standard param names and saved to ../params.csv")
-data_header = paramLookup('param_lookup_table.xlsx','../params.csv',toplevel_second_header)
+print("all data header:\n     "+ ','.join(all_params_in_orig_files))
+print("Matched standard param names and saved to params.csv")
+data_header = paramLookup(**{'lookupfile':'param_lookup_table.xlsx','origHeader':all_params_in_orig_files,'outpath':dataDirs['provenance']})
 print(data_header)
 
 #print the toplevel lines
