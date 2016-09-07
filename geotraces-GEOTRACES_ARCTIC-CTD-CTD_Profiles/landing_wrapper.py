@@ -29,7 +29,6 @@ fileComment = \
 #    U.S. GEOTRACES - Arctic Section
 #      Healy HLY1502
 #      9 August- 12 October 2015
-#      version:20160609ODU
 #    Dataset Version Date: 9 Sept 2016
 '''
 
@@ -59,7 +58,7 @@ print(dataDirs['orig'])
 
 #loop through the files
 for rawfile in rawfiles:
-    print(rawfile)
+    #print(rawfile)
     lineMessages  = [] #populated if any error correction or data manipulation happens
     
     #this is a dictionary which is what toplevel lines are written from
@@ -80,13 +79,15 @@ for rawfile in rawfiles:
     #loop lines, treating header and comment lines different from datalines
     for origline in fraw:
         linecount =linecount+1
+        if re.search('^END',origline):
+            continue
         
         if dataflag == False:  #still in header if false
                
             #data is after "DBAR" line so after this lines get written to files
             if re.search('^DBAR',origline):
                 #this is the end of the header.
-                goflag = 1
+                dataflag = 1
                 
                 #print to toplevel
                 
@@ -153,10 +154,14 @@ for rawfile in rawfiles:
             continue  
         else:  #this is data, progresses here if dataflag == True
             #if it got to here then it's data
-            datalinecount = datalinecount+1
             
-            finalLine = Line(**{'dataline':origline,'lineNum':linecount,'headerline':fileheader})                         
-
+            datalinecount = datalinecount+1
+            origline = re.sub(',( *)',',',origline)
+            origline = origline.strip()
+            
+            finalLine = Line(**{'dataline':origline,'lineNum':linecount,'headerline':fileheader})    
+            if re.search('-999',origline):                     
+                finalLine.replaceAllBadValues()
             ffinal.write(finalLine.getData()+'\n')#prints as comma delimited text
             
             m = finalLine.getLog(**{'format':'dict'})
@@ -166,7 +171,7 @@ for rawfile in rawfiles:
                 
     if len(lineMessages) > 0: #only write out if error messages
         LogDict['fileMessages'].append(OrderedDict([('sourceFile',rawfile), 
-                          ('other_metadata', {'cruise_id':cruise_id,'cast':cast}), 
+                          ('file_messages','stripped spaces after commas and leading whitespace'),
                           ('lineMessages', lineMessages)]))
     
     
