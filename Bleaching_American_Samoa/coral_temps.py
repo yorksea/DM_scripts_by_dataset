@@ -1,8 +1,6 @@
 import os.path
-import re,os,json,sys
+import re,os,sys
 import csv
-
-
 
 '''
 used in directory /data302/palumbi/Bleaching_American_Samoa/scripts/
