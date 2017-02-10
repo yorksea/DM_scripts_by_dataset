@@ -72,16 +72,16 @@ for origfile in origfiles:
             bysite[site] = {}
             
         #print lines list to dictionary
-        if outname in bysite[site]:                
-            bysite[site][outname].append(",".join(outline))
-        else:
+        if outname not in bysite[site]:                
             #initialize it first 
             print "   "+site+" " +outname
             bysite[site][outname] = []
             bysite[site][outname].append('date,time,temp')
-
+            
+        bysite[site][outname].append(",".join(outline))
+        
 # now write everything to site/deployment
-topf_level0 = open("level0_sites.dat","wb")
+topf_level0 = open(outdir+"level0_sites.dat","wb")
 topf_level0.write("site,>\n")
 topf_level0.write("deployment,depth,>\n")
 topf_level0.write("date,time,temp\n")
