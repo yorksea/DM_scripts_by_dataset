@@ -1,6 +1,4 @@
 import os,sys,re,glob,time
-from dataset_tools import Line,utils
-from pip.utils import logging
 
 ## date and time representation
 nowDate =time.strftime("%d %b %Y") #19 Aug 2016
@@ -10,50 +8,41 @@ print(nowDate)
 
 folders = ['IRONMAN','NILSS']
 
- 
-PIname = ('Robert','Sterner');
-        
+          
 for folder in folders:
+    allparams = []  #all params in level 1
+    level1_dats = {} #dictionary for all files to write
+    level0_lines = {}
+        
     print "Folder: "+folder
-    maxWidths = {} #for display purposes
-    fileComment = "# "+folder+" CTD Profiles\n#    P.I. "+PIname[0]+' '+PIname[1]+"\n#    Version "+nowDate
+    datafolder = 'Z:/LaurentianGreatLakes_Chemistry/CTD/'+folder+'/'
+    fileComment = "# "+folder+" CTD Profiles\n#    PI: Robert Sterner\n#    Data version "+nowDate
 
     #setup toplevel file
     #   Station[width=14]    Cast    Date____    Time__    Lat______    Lon_______    >
     #prDM[width=12]    t090[width=12]    c0[width=12]    specc[width=12]    xmiss[width=12]    wetStar[width=12]    dz_dt[width=12]    ph[width=12]    par[width=12]    spar[width=12]    sal00[width=12]    sbeox0_Mm[width=12]    sbeox0_Mg[width=12]    sbeox0_PS[width=12]    wetCDOM[width=12]    latitude[width=12]    longitude[width=12]    scan[width=12]    flag
-    toplevel_header_list = ('CruiseID','Cast','Date','Time','Lat','Lon');
-    toplevel_header = ','.join(toplevel_header_list)
-    second_header_list =('CruiseID','Station','Date','Time','Lat','Lon','press','temp','cond','cond_spec','beam_trans','fluor','O2_mg_L','pH','PAR','flag');
-    second_header = ','.join(second_header_list);
-
-    
-    toplevel_data_delimiter = '\t'#what goes in between toplevel datalines, not the header
-    toplevel_data = {}
-
-    
-    #setup directory structure if doesn't exist already (it checks)
-    dataDirs = utils.setupDirs('../'+folder)# a dictionary of paths          
-    
-    ftop = open('../'+folder+'/'+folder+'_toplevel.dat','w')
+    toplevel_header = ['CruiseID','Station','Date','Time','Lat','Lon','ISO_DateTime_UTC'];
+ 
+    ftop = open(datafolder+folder+'_toplevel.dat','wb')
     ftop.write(fileComment+'\n')
-    ftop.write(toplevel_header+',>\n') #lineText must end ,>
-    ftop.write(second_header+'\n') #lineText must end ,>
+    ftop.write(",".join(toplevel_header)+',>\n') #lineText must end ,>
+   
    # ftop.write()#need to add datetimeparam that is added here
-    
-
-    
+       
              
     #working with just the csvs -----raw to clean------------        
-    rawfiles = os.listdir(dataDirs['raw'])
+    level1files = os.listdir(datafolder+'raw')
     
-
-    print(dataDirs['raw'])
-    for rawfile in rawfiles:
-       # print rawfile
-        fraw = open(dataDirs['raw']+'/'+rawfile,'r')
-        ffinal = open(dataDirs['final']+'/'+rawfile,'w')
-        
-        fparts = rawfile.split("_sheet-")
+    for level1file in level1files:
+        print 'reading '+level1file
+        fraw = open(datafolder+'raw/'+level1file)
+        #ffinal = open(dataDirs['final']+'/'+level1file,'w')
+  
+        #initialize if not exist
+        if level1file not in level1_dats:
+            level1_dats[level1file] = []
+                  
+        fparts = level1file.split("_sheet-")
         cruise_id = fparts[0]
         cast = re.sub('\..*','',fparts[1])
         #add to header comment
@@ -70,72 +59,56 @@ for folder in folders:
                 continue
             
             if re.search('^#',origline) :
-                #print and move on 
-                
-                #check for trailing commas
-                cline = re.sub(',+$','',origline)
-                
-                ffinal.write(cline+'\n')
+                #remove trailing commas, and add to list of output
+                level1_dats[level1file].append( re.sub(',+$','',origline) )
                 continue
             
             datalinecount = datalinecount+1
+            #do header stuff once
             if datalinecount == 1:
-                #write the last comment before the header
-                specificLine = "#     cruise: "+cruise_id+' cast: '+cast+'\n'
-                print(specificLine)
-                ffinal.write(specificLine)
                 
-                header = origline
+                header = origline.split(',')
+                
+                level1_dats[level1file].append("#   cast: "+cast)
+                level1_dats[level1file].append(",".join(header[6:]))
+
+                #add variables to all param list if not already
+                for p in header:
+                    #print p
+                    if p not in allparams:
+                        allparams.append(p)
+                
                 continue
-                
-            # print("#      cruise: "+cruise_id+' cast: '+cast+'\n')                
-            #do line stuff
-            
-            finalLine = Line(origline,header)
-            # lineDict = finalLine.getDataDict()
-            # print(lineDict)
+
+            dline = origline.split(',')
+            level1_dats[level1file].append(",".join(dline[6:]))
+
+            if datalinecount == 2:
+                #first line of real data not header
+
+                #is CruiseID,Station,Date,Time,Lat,Lon data plus the nd for ISO_DateTime_UTC placeholder
+                #index is datetime (dline[2]+dline[3]) so it can be sorted by time
+                level0_lines[dline[2]+dline[3]] = "\t".join(dline[0:6])+'\tnd\tfinal/'+level1file
            
-            #in this case, dont' write first 6 params
-            lineList = finalLine.getDataList()
-            if datalinecount == 10:
-                ftop.write('\t'.join(lineList[0:6])+'\tfinal/'+rawfile+'\n')
-                            
-            ffinal.write(','.join(lineList[7:])+'\n')   
-            
-            
-                    #now test if param is longer than before
-            thisPCount = finalLine.getParamLengths()
-            for k, v in thisPCount.items():
-                #v is the length of that param's value
-                if k not in maxWidths:#then first time so fill it
-                  maxWidths[k] = v+2
-                    
-                #if longer this time then make that the max in the list (+2 is becuase I use that for display)
-                if v+2 > maxWidths[k]:
-                    maxWidths[k] = v+2
-                
-            
-        ffinal.close()
-        fraw.close()
-        
+             
+        fraw.close()        
     
-        
-        dispWidths = '';
-        for p in finalLine.getHeaderList(): 
-                       
-            #check if name is bigger than value
-            if len(p) > maxWidths[p]:    
-                val =  len(p)+2                  
-            else:
-                val = maxWidths[p]
-                   
-            dispWidths = dispWidths+p+'='+str(val)+'; '    
-        fdisp = open('../'+folder+'/'+folder+'dispWidths.txt','w')
-        fdisp.write(dispWidths)
-        fdisp.close()
+    #write everything
     
+    # second line of level1 variables to toplevel file
+
+    ftop.write(",".join(allparams[6:])+'\n')
+    #write the data lines to level 0 topfile in order
+    for k in sorted(level0_lines.keys()):
+        ftop.write(level0_lines[k]+'\n')
+
     ftop.close() #toplevel file
     
-
+    
+    for level1file in level1files:
+        print 'writing '+level1file
+        fout = open(datafolder+'final/'+level1file,'wb')
+        fout.write("\n".join(level1_dats[level1file]))
+        fout.close()
 
 print "Done!"    
